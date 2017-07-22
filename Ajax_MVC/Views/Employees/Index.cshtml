@@ -1,0 +1,442 @@
+﻿@model Ajax_MVC.Models.NorthwindChineseEntities1
+
+@{
+    ViewBag.Title = "Index";
+}
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+    <script src="https://code.jquery.com/jquery-3.2.1.js"></script>
+    <script type="text/javascript">
+        var page = 1; //目前頁數
+        var totalpage = 0; //總頁數
+        var sname = "", stitle = ""; //搜尋欄位[姓名],[職稱]
+        var name = "", title = "", titleofc = "", bdate = "", hdate = "", addr = "", hphone = "", exten = "", ppath = "", notes = "", mid = "", salary = "";
+        var eid = 0, did = 0; //欲修改/刪除資料ID
+        $(function () {
+            //初始頁面
+            queryNum(); //取得資料筆數
+
+            //第一頁
+            $("#first").click(function () {
+                page = 1;
+                queryNum();
+            });
+            //上一頁
+            $("#pre").click(function () {
+                if (page != 1) page--;
+                queryNum();
+            });
+            //下一頁
+            $("#next").click(function () {
+                if (page < totalpage) page++;
+                queryNum();
+            });
+            //最後頁
+            $("#last").click(function () {
+                page = totalpage;
+                queryNum();
+            });
+            //查詢
+            $("#search").click(function () {
+                sname = $("#s_name").val();
+                stitle = $("#s_title").val();
+                page = 1;
+                queryNum();
+            });
+            //按下新增按鈕
+            $("#add").click(function () {
+                $("#name").val("");
+                $("#title").val("");
+                $("#titleofc").val("");
+                $("#bdate").val("");
+                $("#hdate").val("");
+                $("#addr").val("");
+                $("#hphone").val("");
+                $("#exten").val("");
+                $("#ppath").val("");
+                $("#notes").val("");
+                $("#mid").val("");
+                $("#salary").val("");
+                $("#editframe").slideDown("slow"); //顯示編輯區域
+                //預設隱藏提示文字
+                $("#remind_name").hide();
+                $("#remind_title").hide();
+                $("#remind_titleofc").hide();
+                $("#remind_bdate").hide();
+                $("#remind_hdate").hide();
+                $("#remind_addr").hide();
+                $("#remind_hphone").hide();
+                $("#remind_exten").hide();
+                $("#remind_ppath").hide();
+                $("#remind_notes").hide();
+                $("#remind_mid").hide();
+                $("#remind_salary").hide();
+            });
+            //按下確定
+            $("#submit").click(function () {
+                name = $("#name").val();
+                title = $("#title").val();
+                titleofc = $("#titleofc").val();
+                bdate = $("#bdate").val();
+                hdate = $("#hdate").val();
+                addr = $("#addr").val();
+                hphone = $("#hphone").val();
+                exten = $("#exten").val();
+                ppath = $("#ppath").val();
+                notes = $("#notes").val();
+                mid = $("#mid").val();
+                salary = $("#salary").val();
+                //判斷各欄位是否填寫完整，及格式是否正確
+                if (name == "") $("#remind_name").show();
+                else $("#remind_name").hide();
+                if (title == "") $("#remind_title").show();
+                else $("#remind_title").hide();
+                if (titleofc == "") $("#remind_titleofc").show();
+                else $("#remind_titleofc").hide();
+                if (bdate == "") $("#remind_bdate").show();
+                else $("#remind_bdate").hide();
+                if (hdate == "") $("#remind_hdate").show();
+                else $("#remind_hdate").hide();
+                if (addr == "") $("#remind_addr").show();
+                else $("#remind_addr").hide();
+                if (hphone == "") $("#remind_hphone").show();
+                else $("#remind_hphone").hide();
+                if (exten == "") $("#remind_exten").show();
+                else $("#remind_exten").hide();
+                if (ppath == "") $("#remind_ppath").show();
+                else $("#remind_ppath").hide();
+                if (notes == "") $("#remind_notes").show();
+                else $("#remind_notes").hide();
+                if (mid == "" || !$("#mid").val().match("^[0-9]*$")) $("#remind_mid").show();
+                else $("#remind_mid").hide();
+                if (salary == "" || !$("#salary").val().match("^[0-9]*$")) $("#remind_salary").show();
+                else $("#remind_salary").hide();
+                //上傳資料
+                if (name != "" && title != "" && titleofc != "" && bdate != "" && hdate != "" && addr != ""
+                    && hphone != "" && exten != "" && ppath != "" && notes != "" && mid != "" && salary != "") {
+                    if (!mid.match("^[0-9]*$") || !salary.match("^[0-9]*$")) {
+                        if (!mid.match("^[0-9]*$")) $("#remind_mid").show();
+                        if (!salary.match("^[0-9]*$")) $("#remind_salary").show();
+                    } else {
+                        update(); //更新資料
+                    }
+                }
+            });
+            ///取消
+            $("#cancel").click(function () {
+                $("#editframe").slideUp("slow");
+            });
+            //按下編輯
+            $("#list").on("click", "#edit", function () {
+                $("#editframe").hide();
+                var e = $(this).closest(".Employee"); //取得EmployeeID
+                eid = Number(e.data("id"));
+                getEmployeeData(); //取得資料
+            });
+            //按下刪除
+            $("#list").on("click", "#delete", function () {
+                $("#editframe").hide();
+                var d = $(this).closest(".Employee"); //取得EmployeeID
+                did = Number(d.data("id"));
+                if (did != 0) {
+                    var r = confirm("您確定要刪除此筆資料嗎?");
+                    if (r == true) update();
+                    queryNum(); //更新頁面
+                }
+            });
+
+            ///分頁查詢
+            function queryForPages() {
+                $.ajax({
+                    type: "POST",
+                    data: "{'page':'" + page + "','sname':'" + sname + "','stitle':'" + stitle + "'}",
+                    url: "@Url.Action("GetData", "Employees")",
+                    contentType: "application/json; charset=utf-8",
+                    dataType: "json",
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert(xhr.status);
+                        alert(xhr.responseText);
+                        alert(thrownError);
+                    },
+                    success: function (jstring) {
+                        var result = JSON.parse(jstring);
+                        document.getElementById("page").innerHTML = "&emsp;" + page + "&emsp;"; //顯示頁數
+                        $("#editframe").hide(); //隱藏編輯欄位
+                        clearDate(); //清空數據
+
+                        if (page == 1) { //位於第一頁
+                            $("#first").attr("disabled", true);
+                            $("#pre").attr("disabled", true);
+                        } else {
+                            $("#first").attr("disabled", false);
+                            $("#pre").attr("disabled", false);
+                        }
+                        if (page == totalpage) { //位於最後頁
+                            $("#next").attr("disabled", true);
+                            $("#last").attr("disabled", true);
+                        } else {
+                            $("#next").attr("disabled", false);
+                            $("#last").attr("disabled", false);
+                        }
+
+                        for (var i = 0; i < 5; i++) {
+                            $("#list").append(
+                                '<div class="Employee" data-id="' + result[i].EmployeeID + '">' + //data- 開頭之屬性在頁面上不顯示
+                                '<div>姓名：<span class="name">' + result[i].EmployeeName + '  </span><button id="edit" >編輯</button> <button id="delete" >刪除</button></div>' +
+                                '<div>職稱：<span class="title">' + result[i].Title + '</span></div>' +
+                                '<div>生日：<span class="bdate">' + new Date(result[i].BirthDate).toLocaleDateString("ja-JP") + '</span></div>' + //利用 toLocaleDateString 方法格式化日期
+                                '<div>住址：<span class="addr">' + result[i].Address + '</span></div>' +
+                                '<div>薪水：<span class="salary">' + result[i].Salary + '</span></div>' +
+                                '</div>' +
+                                '<p></p>-------------------------------------');
+                        }
+
+                    }
+                });
+            }
+
+            ///取得資料筆數
+            function queryNum() {
+                $.ajax({
+                    type: "POST",
+                    data: "{'totalpage':'" + totalpage + "','sname':'" + sname + "','stitle':'" + stitle + "'}",
+                    url: "@Url.Action("GetNum", "Employees")",
+                    contentType: "application/json; charset=utf-8",
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert(xhr.status);
+                        alert(xhr.responseText);
+                        alert(thrownError);
+                    },
+                    success: function (data) {
+                        totalpage = data;
+                        queryForPages(); //分頁查詢資料庫
+                        //初始化
+                        eid = 0;
+                        did = 0;
+                    }
+                });
+            }
+
+            ///更新資料
+            function update() {
+                $.ajax({
+                    type: "POST",
+                    data: "{'eid':'" + eid + "','did':'" + did + "','name':'" + name + "','title':'" + title + "','titleofc':'" + titleofc + "','bdate':'" + bdate + "','hdate':'" + hdate + "','addr':'" + addr + "','hphone':'" + hphone + "','exten':'" + exten + "','ppath':'" + ppath + "','notes':'" + notes + "','mid':'" + mid + "','salary':'" + salary + "'}",
+                    url: "@Url.Action("Update", "Employees")",
+                    contentType: "application/json; charset=utf-8",
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert(xhr.status);
+                        alert(xhr.responseText);
+                        alert(thrownError);
+                    },
+                    success: function (data) {
+                        alert(data);
+                        $("#editframe").slideUp("slow");
+                        queryNum(); //更新頁面
+                    }
+                });
+            }
+
+            ///取得Employee資料
+            function getEmployeeData() {
+                $.ajax({
+                    type: "POST",
+                    data: "{'eid':'" + eid + "'}",
+                    url: "@Url.Action("GetEmployeeData", "Employees")",
+                    contentType: "application/json; charset=utf-8",
+                    dataType: "json",
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert(xhr.status);
+                        alert(xhr.responseText);
+                        alert(thrownError);
+                    },
+                    success: function (jstring) {
+                        var result = JSON.parse(jstring);
+                        name = result[0].EmployeeName;
+                        title = result[0].Title;
+                        titleofc = result[0].TitleOfCourtesy;
+                        bdate = formatDate(result[0].BirthDate);
+                        hdate = formatDate(result[0].HireDate);
+                        addr = result[0].Address;
+                        hphone = result[0].HomePhone;
+                        exten = result[0].Extension;
+                        ppath = result[0].PhotoPath;
+                        notes = result[0].Notes;
+                        mid = result[0].ManagerID;
+                        salary = result[0].Salary;
+                        //預設隱藏提示文字
+                        $("#remind_name").hide();
+                        $("#remind_title").hide();
+                        $("#remind_titleofc").hide();
+                        $("#remind_bdate").hide();
+                        $("#remind_hdate").hide();
+                        $("#remind_addr").hide();
+                        $("#remind_hphone").hide();
+                        $("#remind_exten").hide();
+                        $("#remind_ppath").hide();
+                        $("#remind_notes").hide();
+                        $("#remind_mid").hide();
+                        $("#remind_salary").hide();
+                        //將取得料填入各欄位
+                        $("#name").val(name);
+                        $("#title").val(title);
+                        $("#titleofc").val(titleofc);
+                        $("#bdate").val(bdate);
+                        $("#hdate").val(hdate);
+                        $("#addr").val(addr);
+                        $("#hphone").val(hphone);
+                        $("#exten").val(exten);
+                        $("#ppath").val(ppath);
+                        $("#notes").val(notes);
+                        $("#mid").val(mid);
+                        $("#salary").val(salary);
+
+                        $("#editframe").slideDown("slow"); //顯示編輯區域
+
+                    }
+                });
+            }
+
+            ///時間格式轉換
+            function formatDate(date) {
+                var d = new Date(date),
+                    month = '' + (d.getMonth() + 1),
+                    day = '' + d.getDate(),
+                    year = d.getFullYear();
+
+                if (month.length < 2) month = '0' + month;
+                if (day.length < 2) day = '0' + day;
+
+                return [year, month, day].join('-');
+            }
+
+            ///清空數據
+            function clearDate() {
+                $("#list").html("");
+            }
+        });
+    </script>
+</head>
+<body>
+    <div>
+        <form>
+            <input type="text" id="s_name" placeholder="查詢姓名" value="" />
+            <input type="text" id="s_title" placeholder="查詢職稱" value="" />
+            <input type="button" id="search" value="查詢" />
+        </form>
+        <p></p>
+        <input type="button" id="first" value="第一頁" />
+        <input type="button" id="pre" value="上一頁" />
+        <strong id="page">&emsp;1&emsp;</strong>
+        <input type="button" id="next" value="下一頁" />
+        <input type="button" id="last" value="最後頁" />
+        <input type="button" id="add" value="新增" style="position:relative; left:30px" />
+    </div>
+    <h1></h1>
+    <div id="list"></div>
+    <div id="editframe" style="position:absolute; top:120px; left:500px; border-style:double; border-color:lemonchiffon; padding:5px; display:none ">
+        <table>
+            <tr>
+                <th>EmployeeName</th>
+                <td>
+                    <input type="text" id="name" />
+
+                </td>
+                <td><small id="remind_name" style="color:red">EmployeeName為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>Title</th>
+                <td>
+                    <input type="text" id="title" />
+                </td>
+                <td><small id="remind_title" style="color:red">Title為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>TitleOfCourtesy</th>
+                <td>
+                    <input type="text" id="titleofc" />
+                </td>
+                <td><small id="remind_titleofc" style="color:red">TitleOfCourtesy為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>BirthDate</th>
+                <td>
+                    <input type="Date" id="bdate" runat="server" />
+                </td>
+                <td><small id="remind_bdate" style="color:red">BirthDate為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>HireDate</th>
+                <td>
+                    <input type="Date" id="hdate" runat="server" />
+                </td>
+                <td><small id="remind_hdate" style="color:red">HireDate為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>Address</th>
+                <td>
+                    <input type="text" id="addr" />
+                </td>
+                <td><small id="remind_addr" style="color:red">Address為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>HomePhone</th>
+                <td>
+                    <input type="text" id="hphone" />
+                </td>
+                <td><small id="remind_hphone" style="color:red">HomePhone為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>Extension</th>
+                <td>
+                    <input type="text" id="exten" />
+                </td>
+                <td><small id="remind_exten" style="color:red">Extension為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>PhotoPath</th>
+                <td>
+                    <input type="text" id="ppath" />
+                </td>
+                <td><small id="remind_ppath" style="color:red">PhotoPath為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>Notes</th>
+                <td>
+                    <input type="text" id="notes" />
+                </td>
+                <td><small id="remind_notes" style="color:red">Notes為必填欄位</small></td>
+            </tr>
+            <tr>
+                <th>ManagerID</th>
+                <td>
+                    <input type="text" id="mid" />
+                </td>
+                <td><small id="remind_mid" style="color:red">請填入ManagerID欄位正確格式(數字)</small></td>
+            </tr>
+            <tr>
+                <th>Salary</th>
+                <td>
+                    <input type="text" id="salary" />
+                </td>
+                <td><small id="remind_salary" style="color:red">請填入Salary欄位正確格式(數字)</small></td>
+            </tr>
+            <tr>
+                <th colspan="2" style="text-align: center">
+                    <div id="newbuttonfield">
+                        <p></p>
+                        <input type="button" id="submit" value="確定" />
+                        <input type="button" id="cancel" value="取消" />
+                    </div>
+                </th>
+            </tr>
+        </table>
+    </div>
+
+</body>
+</html>
